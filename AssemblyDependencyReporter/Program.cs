@@ -50,16 +50,15 @@ namespace AssemblyDependencyReporter
             // Current assembly (target assembly)
             try
             {
+                // Load in context
                 Assembly assembly = Assembly.LoadFrom(targetAssemblyPath);
-                targetLocation = assembly.Location;
-
                 AssemblyName[] currentReferences = assembly.GetReferencedAssemblies();
 
-                // Top should be left most item
+                // Top should be left most item (in context dependencies)
                 foreach (var currentReference in currentReferences.Reverse())
                     referenceStack.Push(new AssemblyInfo(currentReference.FullName, 1));
 
-                referenceStack.Push(new AssemblyInfo(assembly.FullName));
+                references.Add(new AssemblyInfo(assembly.FullName));
             }
             catch (Exception) // target assembly problem
             {
