@@ -46,10 +46,19 @@ namespace AssemblyDependencyReporter
             List<AssemblyInfo> references = new List<AssemblyInfo>();
             Stack<AssemblyInfo> referenceStack = new Stack<AssemblyInfo>();
 
+            var targetLocation = String.Empty;
             // Current assembly (target assembly)
             try
             {
                 Assembly assembly = Assembly.LoadFrom(targetAssemblyPath);
+                targetLocation = assembly.Location;
+
+                AssemblyName[] currentReferences = assembly.GetReferencedAssemblies();
+
+                // Top should be left most item
+                foreach (var currentReference in currentReferences.Reverse())
+                    referenceStack.Push(new AssemblyInfo(currentReference.FullName, 1));
+
                 referenceStack.Push(new AssemblyInfo(assembly.FullName));
             }
             catch (Exception) // target assembly problem
