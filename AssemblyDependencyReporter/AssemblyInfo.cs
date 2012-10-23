@@ -5,8 +5,9 @@ using System.Text;
 
 namespace AssemblyDependencyReporter
 {
-    internal struct AssemblyInfo 
+    public struct AssemblyInfo 
     {
+        internal readonly String DisplayName;
         internal readonly String Name;
         internal readonly Int32 Depth;
         internal readonly AssemblyRefStatus Status;
@@ -16,9 +17,10 @@ namespace AssemblyDependencyReporter
         /// </summary>
         /// <param name="name"></param>
         /// <param name="depth"></param>
-        public AssemblyInfo(String name, Int32 depth = 0, AssemblyRefStatus status = AssemblyRefStatus.None)
+        public AssemblyInfo(String name, String display, Int32 depth = 0, AssemblyRefStatus status = AssemblyRefStatus.None)
         {
             this.Name = name;
+            this.DisplayName = display;
             this.Depth = depth;
             this.Status = status;
         }
@@ -49,7 +51,7 @@ namespace AssemblyDependencyReporter
         }
     }
 
-    internal enum AssemblyRefStatus
+    public enum AssemblyRefStatus
     {
         /// <summary>
         /// Ok

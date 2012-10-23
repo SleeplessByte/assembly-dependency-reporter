@@ -32,16 +32,20 @@ namespace AssemblyDependencyReporter
                 ReferencesToXML(fileName, "Results.xml");
             ReferencesToConsole(fileName);
 
-            Console.WriteLine("Press a key to exit.");
-            Console.ReadKey();
+            // Running from console without args
+            if (args.Length == 0)
+            {
+                Console.WriteLine("Press a key to exit.");
+                Console.ReadKey();
+            }
         }
 
         /// <summary>
-        /// 
+        /// Finds all references of target assembly
         /// </summary>
-        /// <param name="targetAssemblyPath"></param>
+        /// <param name="targetAssemblyPath">Path to target assembly</param>
         /// <returns></returns>
-        internal static List<AssemblyInfo> FindReferences(String targetAssemblyPath)
+        public static List<AssemblyInfo> FindReferences(String targetAssemblyPath)
         {
             List<AssemblyInfo> references = new List<AssemblyInfo>();
             Stack<AssemblyInfo> referenceStack = new Stack<AssemblyInfo>();
@@ -56,9 +60,9 @@ namespace AssemblyDependencyReporter
 
                 // Top should be left most item (in context dependencies)
                 foreach (var currentReference in currentReferences.Reverse())
-                    referenceStack.Push(new AssemblyInfo(currentReference.FullName, 1));
+                    referenceStack.Push(new AssemblyInfo(currentReference.FullName, currentReference.Name, 1));
 
-                references.Add(new AssemblyInfo(assembly.FullName));
+                references.Add(new AssemblyInfo(assembly.FullName, assembly.GetName().Name));
             }
             catch (Exception) // target assembly problem
             {
@@ -82,7 +86,7 @@ namespace AssemblyDependencyReporter
 
                         // Top should be left most item
                         foreach (var currentReference in currentReferences.Reverse())
-                            referenceStack.Push(new AssemblyInfo(currentReference.FullName, currentInfo.Depth + 1));
+                            referenceStack.Push(new AssemblyInfo(currentReference.FullName, currentReference.Name, currentInfo.Depth + 1));
 
                         // Add reference as processed
                         references.Add(currentInfo);
@@ -91,22 +95,22 @@ namespace AssemblyDependencyReporter
                     catch (ArgumentNullException)
                     {
                         // Null reference
-                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.Depth, AssemblyRefStatus.Null));
+                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.DisplayName, currentInfo.Depth, AssemblyRefStatus.Null));
                     }
                     catch (FileNotFoundException)
                     {
                         // Not found reference
-                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.Depth, AssemblyRefStatus.NotFound));
+                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.DisplayName, currentInfo.Depth, AssemblyRefStatus.NotFound));
                     }
                     catch (BadImageFormatException)
                     {
                         // Assembly invalid
-                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.Depth, AssemblyRefStatus.BadImage));
+                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.DisplayName, currentInfo.Depth, AssemblyRefStatus.BadImage));
                     }
                     catch (SecurityException)
                     {
                         // Permission problem
-                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.Depth, AssemblyRefStatus.NoPermission));
+                        references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.DisplayName, currentInfo.Depth, AssemblyRefStatus.NoPermission));
                     }
                 }
             }
@@ -115,21 +119,35 @@ namespace AssemblyDependencyReporter
         }
 
         /// <summary>
-        /// 
+        /// Finds references and outputs to console
         /// </summary>
         /// <param name="targetAssemblyPath"></param>
-        internal static void ReferencesToConsole(String targetAssemblyPath)
+        internal static void ReferencesToConsole(String targetAssemblyPath, List<AssemblyInfo> references = null)
         {
-            List<AssemblyInfo> references = FindReferences(targetAssemblyPath);
+            references = references == null ? FindReferences(targetAssemblyPath) : references;
 
             if (references == null)
             {
                 Console.WriteLine("Could not load target assembly.");
                 return;
             }
-            
+
+            // Tree
             foreach (AssemblyInfo assembly in references)
-                Console.WriteLine(assembly.Name.PadLeft(assembly.Name.Length + assembly.Depth * 2, ' '));
+            {
+                var status = assembly.DisplayName + (assembly.Status == AssemblyRefStatus.None ? String.Empty : " with status: " + assembly.Status);
+                Console.WriteLine(status.PadLeft(status.Length + assembly.Depth * 2, ' '));
+            }
+
+            Console.WriteLine(String.Format("{0} assemblies", references.Count));
+
+            // Errors
+            foreach (AssemblyInfo assembly in references)
+            {
+                if (assembly.Status == AssemblyRefStatus.None )
+                    continue;
+                Console.WriteLine(String.Format("{0}: {1}", assembly.Status, assembly.Name));
+            }
         } 
 
         /// <summary>
@@ -137,14 +155,14 @@ namespace AssemblyDependencyReporter
         /// </summary>
         /// <param name="targetAssemblyPath"></param>
         /// <param name="fileName"></param>
-        internal static void ReferencesToXML(String targetAssemblyPath, String fileName)
+        internal static void ReferencesToXML(String targetAssemblyPath, String fileName, List<AssemblyInfo> references = null)
         {
             // Find references
-            List<AssemblyInfo> references = FindReferences(targetAssemblyPath);
+            references = references == null ? FindReferences(targetAssemblyPath) : references;
 
             if (references == null)
             {
-                Console.WriteLine("Could not load target assembly");
+                Console.WriteLine("Could not load target assembly.");
                 return;
             }
 
