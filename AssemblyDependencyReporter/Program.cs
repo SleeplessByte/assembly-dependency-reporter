@@ -55,7 +55,7 @@ namespace AssemblyDependencyReporter
             try
             {
                 // Load in context
-                Assembly assembly = Assembly.LoadFrom(targetAssemblyPath);
+                Assembly assembly = Assembly.LoadFile(targetAssemblyPath);
                 AssemblyName[] currentReferences = assembly.GetReferencedAssemblies();
 
                 // Top should be left most item (in context dependencies)
@@ -63,6 +63,7 @@ namespace AssemblyDependencyReporter
                     referenceStack.Push(new AssemblyInfo(currentReference.FullName, currentReference.Name, 1));
 
                 references.Add(new AssemblyInfo(assembly.FullName, assembly.GetName().Name));
+                targetLocation = assembly.Location;
             }
             catch (Exception) // target assembly problem
             {
@@ -80,7 +81,6 @@ namespace AssemblyDependencyReporter
                     // Find children
                     try
                     {
-
                         Assembly currentAssembly = Assembly.Load(currentInfo.Name);
                         AssemblyName[] currentReferences = currentAssembly.GetReferencedAssemblies();
 
@@ -90,7 +90,6 @@ namespace AssemblyDependencyReporter
 
                         // Add reference as processed
                         references.Add(currentInfo);
-
                     }
                     catch (ArgumentNullException)
                     {
@@ -99,6 +98,69 @@ namespace AssemblyDependencyReporter
                     }
                     catch (FileNotFoundException)
                     {
+                        // We didn't found the assembly in the PATH, COM or .NET so now we are rescueing
+                        // and trying to find it in any of the subdirectories. This might be taking long 
+                        // and might not find the thing you are looking for, but it's a short shot.
+                        var path = targetLocation;
+                        var fileStack = new Stack<String>();
+                        var dirStack = new Stack<String>();
+
+                        Assembly foundAssembly = null;
+                        dirStack.Push(new FileInfo(path).Directory.FullName);
+
+                        // Get some directory
+                        while (dirStack.Count > 0)
+                        {
+                            var dir = dirStack.Pop();
+                            // Push the files on the stack
+                            foreach (var efile in Directory.EnumerateFiles(dir))
+                                fileStack.Push(efile);
+
+                            while (fileStack.Count > 0)
+                            {
+                                var file = fileStack.Pop();
+                                
+                                // If assembly capable
+                                FileInfo info = new FileInfo(file);
+                                if (new[] { ".dll", ".exe" }.Any(ext => ext == info.Extension))
+                                {
+                                    try
+                                    {
+                                        var testAssembly = Assembly.LoadFrom(file);
+                                        if (testAssembly.FullName == currentInfo.Name)
+                                        {
+                                            foundAssembly = testAssembly;
+                                            break;
+                                        }
+                                    }
+                                    catch (Exception)
+                                    {
+                                        continue;
+                                    }
+                                }
+                            }
+
+                            if (foundAssembly != null)
+                                break;
+
+                            foreach (var edir in Directory.EnumerateDirectories(dir))
+                                dirStack.Push(edir);
+                        }
+
+                        // Yes found it!
+                        if (foundAssembly != null)
+                        {
+                            AssemblyName[] currentReferences = foundAssembly.GetReferencedAssemblies();
+
+                            // Top should be left most item
+                            foreach (var currentReference in currentReferences.Reverse())
+                                referenceStack.Push(new AssemblyInfo(currentReference.FullName, currentReference.Name, currentInfo.Depth + 1));
+
+                            // Add reference as processed
+                            references.Add(currentInfo);
+                            continue;
+                        }
+
                         // Not found reference
                         references.Add(new AssemblyInfo(currentInfo.Name, currentInfo.DisplayName, currentInfo.Depth, AssemblyRefStatus.NotFound));
                     }
